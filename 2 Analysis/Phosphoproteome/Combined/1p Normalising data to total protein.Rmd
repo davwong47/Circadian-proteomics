@@ -236,3 +236,20 @@ master_list <- cbind(phospho_normalised[49:ncol(phospho_normalised)], phospho_no
 write.csv(master_list, "All_phospho_normalised_total_protein.csv", row.names = F)
 
 ```
+
+```{r}
+# Prepare .txt files for eJTK
+
+# Separate into WT + CKO
+WTeJTKcomb <- cbind(master_list$Phosphosite, dplyr::select(master_list, contains("WT")))
+CKOeJTKcomb <- cbind(master_list$Phosphosite, master_list[,49:ncol(master_list)])
+
+# Colnames need to be: "#" for IDs, then CT or ZT preceding timepoint number
+colnames(WTeJTKcomb) <- c("ID", paste(rep("CT", 24), seq(0, 69, 3), sep=""))
+colnames(CKOeJTKcomb) <- c("ID", paste(rep("CT", 24), seq(0, 69, 3), sep=""))
+
+# Files need to be tab-separated
+write.table(WTeJTKcomb, file = "WTeJTKcomb-p2.txt", sep = "\t", row.names = F, col.names = T, quote = F)
+write.table(CKOeJTKcomb, file = "CKOeJTKcomb-p2.txt", sep = "\t", row.names = F, col.names = T, quote = F)
+
+```

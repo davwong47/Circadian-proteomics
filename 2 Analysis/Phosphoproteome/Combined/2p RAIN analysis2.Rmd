@@ -1,0 +1,105 @@
+---
+title: "Phosphoproteomics data RAIN analysis"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Combined analysis Notebook 2 - DESCRIPTION
+#
+# Here we take the normalised data and perform Rhythmicity Analysis Incorporating Non-parametric methods (RAIN).
+# Thaben and Westermark, 2014, JBR. https://journals.sagepub.com/doi/10.1177/0748730414553029
+# This algorithm is used because it is more sensitive than alternatives. The tradeoff is a higher false positive rate.
+# We deem this acceptable since proteomics studies need to be followed by validation studies.
+#
+# INPUTS = normalised data (.csv)
+# OUTPUTS = lists of rhythmic phosphopeptides, arrhythmic phosphopeptides, and also full list of RAIN results (.csv)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+
+if (!require("BiocManager")) {
+  install.packages("BiocManager", dependencies = TRUE)
+}
+
+if (!require("rain")) {
+  BiocManager::install("rain")
+  library(rain)
+}
+
+# Make a list of all the .txt files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+
+# read the raw data file
+data_start <- read.csv("All_phospho_normalised_total_protein.csv", stringsAsFactors=FALSE)
+
+# re-create dataframe with just normalised data - delete first 3 columns
+data_irs <- data_start[,-1:-24]
+
+```
+
+
+
+```{r}
+# Create preparation matrices for RAIN input
+WT_RAIN_prep <- cbind(data_irs[1:24])
+CKO_RAIN_prep <- cbind(data_irs[25:48])
+
+#Transpose to create the inputs for RAIN.
+WT_RAIN_input <- t(WT_RAIN_prep)
+CKO_RAIN_input <- t(CKO_RAIN_prep)
+
+#create matrix for RAIN output
+WT_RAIN_output <- as.data.frame(matrix(0,nrow(WT_RAIN_prep), 4))
+CKO_RAIN_output <- as.data.frame(matrix(0,nrow(CKO_RAIN_prep), 4))
+
+#Perform RAIN analysis
+step = 3 #number of hours between timepoints
+period = 24 #specify period length to test for
+rep = 1 #number of biological replicates
+
+# Perform the RAIN analysis here
+# RAIN automatically provides p values corrected for multiple testing using the adaptive Benjamini-Hochberg method
+# See the paper for more details: Thaben and Westermark, 2014, JBR. https://journals.sagepub.com/doi/10.1177/0748730414553029
+
+WT_RAIN_output <- rain(WT_RAIN_input, step, period, nr.series = rep)
+CKO_RAIN_output <- rain(CKO_RAIN_input, step, period, nr.series = rep)
+
+#Assign gene names to the rows
+names <- cbind(data_start$Phosphosite, data_start$Protein, data_start$Protein.names, data_start$Gene.names)
+
+WT_RAIN_output_1 <- cbind(names, WT_RAIN_output)
+CKO_RAIN_output_1 <- cbind(names, CKO_RAIN_output)
+
+colnames(WT_RAIN_output_1) <- c("Phosphosite", "Uniprot_ID",  "Protein_names", "Gene_names", "pVal", "phase", "peak.shape", "period")
+colnames(CKO_RAIN_output_1) <- c("Phosphosite", "Uniprot_ID",  "Protein_names", "Gene_names", "pVal", "phase", "peak.shape", "period")
+```
+
+
+```{r}
+#Export the significant + insignificant hits including normalised data + also export total data
+
+WT_results<- cbind(WT_RAIN_output_1, data_irs[1:24])
+CKO_results <- cbind(CKO_RAIN_output_1, data_irs[25:48])
+
+write.csv(WT_results[WT_results$pVal <= 0.05,], "WT_phosphoproteome_all_significant_RAIN2.csv", row.names = F)
+write.csv(CKO_results[CKO_results$pVal <= 0.05,], "CKO_phosphoproteome_all_significant_RAIN2.csv", row.names = F)
+
+write.csv(WT_results[WT_results$pVal > 0.05,], "WT_phosphoproteome_all_insignificant_RAIN2.csv", row.names = F)
+write.csv(CKO_results[CKO_results$pVal > 0.05,], "CKO_phosphoproteome_all_insignificant_RAIN2.csv", row.names = F)
+
+write.csv(WT_results, "WT.p_RAIN_results2.csv", row.names = F)
+write.csv(CKO_results, "CKO.p_RAIN_results2.csv", row.names = F)
+```
